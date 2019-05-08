@@ -1,14 +1,19 @@
 'use strict';
 
-import path from 'path';
 import crypto from 'crypto';
 import { ajax } from 'rxjs/ajax';
 import { map, pluck } from 'rxjs/operators';
+import _ from 'lodash/fp';
+import { sls } from './sls/sls';
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
+interface Selector {
+  projectName?: string;
+  logStore?: string;
+}
 // protobuf
-import protobuf from 'protobufjs';
-const builder = protobuf.loadSync(path.join(__dirname, './sls.proto'));
-const LogProto = builder.lookupType('sls.LogGroupList');
+//import protobuf from 'protobufjs';
+//const builder = protobuf.loadSync(path.join(__dirname, './sls.proto'));
+//const LogGroupListProto = builder.lookupType('sls.LogGroupList');
 
 global.XMLHttpRequest = require('xhr2');
 //@ts-ignore
@@ -20,22 +25,55 @@ export interface LogConfig {
   region?: 'cn-hangzhou';
   accessKeyId: string;
   accessKeySecret: string;
+  projectName: string;
+  logStore: string;
 }
-export class Client {
-  private region: string;
-  private net: string;
-  private accessKeyId: string;
-  private accessKeySecret: string;
-  private endpoint: string;
+/**
+ * @description 阿里云日志服务客户端
+ * @author jx
+ * @date 2019-05-07
+ * @export
+ * @class SlsClient
+ */
+export default class SlsClient {
+  private static config: LogConfig;
+  private static createVarByTemplate = (
+    symbols: (keyof LogConfig)[],
+    template: string,
+    option?: Partial<LogConfig>
+  ) =>
+    symbols.reduce(
+      (result, symbol) =>
+        result.replace(
+          new RegExp(`{${symbol}}`, 'g'),
+          { ...SlsClient.config, ...(option || {}) }[symbol] || symbol
+        ),
+      template
+    );
+  private static baseString = '.log.aliyuncs.com';
   constructor(config: LogConfig) {
-    this.region = (config.region || '').toString();
-    this.net = (config.net || '').toString();
-    this.accessKeyId = config.accessKeyId;
-    this.accessKeySecret = config.accessKeySecret;
-    this.endpoint =
+    SlsClient.config = config;
+    config.endpoint =
       config.endpoint ||
-      `${this.region}${this.net ? `-${this.net}` : ''}.log.aliyuncs.com`;
+      SlsClient.createVarByTemplate(
+        ['net', 'region'],
+        '{region}-{net}' + SlsClient.baseString
+      );
   }
+  /**
+   * @description 从url解析出path部分，主要用于签名
+   * @private
+   * @static
+   * @memberof SlsClient
+   */
+  private static getPathByUrl = (url: string) =>
+    (url.split('?').shift() || url).split(SlsClient.baseString).pop() || url;
+  /**
+   * @description 默认header
+   * @private
+   * @static
+   * @memberof SlsClient
+   */
   private static baseHeader = {
     accept: 'application/x-protobuf',
     'content-type': 'application/x-protobuf',
@@ -43,23 +81,24 @@ export class Client {
     'x-log-apiversion': '0.6.0',
     'x-log-signaturemethod': 'hmac-sha1'
   };
+  /**
+   *  请求api
+   * @param url 请求地址
+   * @param method 方法
+   * @param queries 查询对象
+   * @param body 查询主体
+   * @param setHeaders 补充header
+   */
   action<T extends Record<string, any>>(
-    option: {
-      method: Method;
-      path: string;
-      projectName?: string;
-    },
+    url: string,
+    method: Method,
     queries: T,
-    body: Buffer | Uint8Array | null,
+    body?: Buffer | Uint8Array | null,
     setHeaders?: { [k: string]: any }
   ) {
-    const url = `http://${option.projectName ? `${option.projectName}.` : ''}${
-      this.endpoint
-    }${option.path}?${Object.entries(queries)
-      .map(pair => `${pair[0]}=${pair[1]}`)
-      .join('&')}`;
+    console.log(url);
     const headers: Record<string, any> = {
-      ...Client.baseHeader,
+      ...SlsClient.baseHeader,
       date: new Date().toUTCString(),
       ...(setHeaders || {}),
       ...(body
@@ -74,51 +113,107 @@ export class Client {
         : {})
     };
 
-    headers['authorization'] = this.sign(
-      option.method,
-      option.path,
+    headers['authorization'] = SlsClient.sign(
+      method,
+      SlsClient.getPathByUrl(url),
       queries,
       headers
     );
-    // return from(
-    //   httpx.request(url, { method: option.method, data: body, headers })
-    // ).pipe(switchMap(response => httpx.read(response)));
     return ajax({
       url,
-      method: option.method,
+      method,
       body,
       headers,
       responseType: 'arraybuffer'
     });
   }
-  pullLogs = (option: {
-    projectName: string;
-    logStore: string;
-    shards?: number;
-    cursor: string;
-    count?: number;
-  }) => {
-    const { projectName, logStore, shards = 0, cursor, count = 10 } = option;
+  /**
+   * @description 无主体请求
+   * @param urlParams 用于构造url的参数
+   * @param queries
+   * @param selector 自定义project或logstore
+   * @private
+   * @memberof SlsClient
+   */
+  private noBodyAction = <T = Record<string, any>>(
+    urlParams: {
+      keys: (keyof LogConfig)[];
+      template: string;
+    },
+    queries: T,
+    selector?: Partial<LogConfig>
+  ) => {
+    const url = SlsClient.createVarByTemplate(
+      urlParams.keys,
+      urlParams.template,
+      selector
+    );
     return this.action(
-      {
-        projectName,
-        path: `/logstores/${logStore}/shards/${shards}`,
-        method: 'GET'
-      },
-      { cursor, count, type: 'logs' },
-      null
-    ).pipe(
-      map(response => {
-        console.log(response.xhr.getAllResponseHeaders());
-        return response;
-      }),
-      pluck('response'),
-      map((buffer: ArrayBuffer) =>
-        LogProto.decode(new Uint8Array(buffer, 0, buffer.byteLength))
-      )
+      url + '?' + SlsClient.queryString(queries),
+      'GET',
+      queries
     );
   };
-  private sign(
+  /**
+   * @description 拉取日志
+   * @memberof SlsClient
+   */
+  pullLogs = (
+    option: {
+      shards?: number;
+      cursor: string;
+      count?: number;
+    },
+    selector?: { projectName?: string; logStore?: string }
+  ) =>
+    this.noBodyAction(
+      {
+        keys: ['endpoint', 'logStore', 'projectName'],
+        template: `http://{projectName}.{endpoint}/logstores/{logStore}/shards/${option.shards ||
+          0}`
+      },
+      { cursor: option.cursor, count: option.count || 10, type: 'log' },
+      selector
+    ).pipe(
+      pluck('response'),
+      map((buffer: ArrayBuffer) =>
+        sls.LogGroupList.decode(new Uint8Array(buffer, 0, buffer.byteLength))
+      )
+    );
+  /**
+   * @description 指定游标获取日志
+   * @memberof SlsClient
+   */
+  getLogs = (
+    option: { startCursor: string; endCursor: string; shards: number },
+    selector?: Selector
+  ) => {
+    const iStart = BigInt(Buffer.from(option.startCursor, 'base64').toString());
+    const iEnd = BigInt(Buffer.from(option.endCursor, 'base64').toString());
+    return this.pullLogs(
+      {
+        count: parseInt((iEnd - iStart).toString()),
+        cursor: option.startCursor,
+        shards: option.shards
+      },
+      selector
+    );
+  };
+  static bufferToLogList = (buffer: Buffer) => sls.LogGroupList.decode(buffer);
+  /**
+   * @description 签名
+   * @author jx
+   * @date 2019-05-07
+   * @private
+   * @static
+   * @param {Method} verb
+   * @param {string} path
+   * @param {Record<string, any>} queries
+   * @param {Record<string, any>} headers
+   * @returns
+   * @memberof SlsClient
+   */
+  private static sign(
     verb: Method,
     path: string,
     queries: Record<string, any>,
@@ -127,16 +222,16 @@ export class Client {
     const contentMD5 = headers['content-md5'] || '';
     const contentType = headers['content-type'] || '';
     const date = headers['date'];
-    const canonicalizedHeaders = Client.getCanonicalizedHeaders(headers);
-    const canonicalizedResource = Client.getCanonicalizedResource(
+    const canonicalizedHeaders = SlsClient.getCanonicalizedHeaders(headers);
+    const canonicalizedResource = SlsClient.getCanonicalizedResource(
       path,
       queries
     );
     const signString =
       `${verb}\n${contentMD5}\n${contentType}\n` +
       `${date}\n${canonicalizedHeaders}${canonicalizedResource}`;
-    return `LOG ${this.accessKeyId}:${crypto
-      .createHmac('sha1', this.accessKeySecret)
+    return `LOG ${SlsClient.config.accessKeyId}:${crypto
+      .createHmac('sha1', SlsClient.config.accessKeySecret)
       .update(signString)
       .digest('base64')}`;
   }
@@ -150,8 +245,9 @@ export class Client {
   private static getCanonicalizedResource = (
     path: string,
     queries: Record<string, any>
-  ) =>
-    `${path}?${Object.entries(queries)
+  ) => `${path}?${SlsClient.queryString(queries)}`;
+  private static queryString = (queries: Record<string, any>) =>
+    Object.entries(queries)
       .map(
         pair =>
           `${pair[0]}=${
@@ -159,5 +255,25 @@ export class Client {
           }`
       )
       .sort()
-      .join('&')}`;
+      .join('&');
+  static fromPairsToObject = <T = Record<string, string>>(
+    mapField: { key: keyof T; value: keyof T } = {
+      key: 'Key' as keyof T,
+      value: 'Value' as keyof T
+    }
+  ) =>
+    _.compose(
+      _.fromPairs,
+      _.reduce(
+        (pairs: [string, string][], part: T) =>
+          [
+            ...pairs,
+            [part[mapField.key].toString(), part[mapField.value].toString()]
+          ] as [string, string][],
+        []
+      )
+    );
+  static readKvList: <O = any>(
+    param: { Key: string; Value: string }[]
+  ) => O = SlsClient.fromPairsToObject({ key: 'Key', value: 'Value' });
 }
