@@ -6,6 +6,7 @@ import { map, pluck } from 'rxjs/operators';
 import _ from 'lodash/fp';
 import { sls } from './sls/sls';
 import { LogGroup } from './contract';
+import { Observable } from 'rxjs/internal/Observable';
 //@ts-ignore
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Selector {
@@ -122,7 +123,6 @@ export default class SlsClient {
       queries,
       headers
     );
-    console.log(headers);
 
     return ajax({
       url,
@@ -192,7 +192,7 @@ export default class SlsClient {
   getLogs = (
     option: { startCursor: string; endCursor: string; shards: number },
     selector?: Selector
-  ) => {
+  ): Observable<sls.LogGroupList> => {
     const iStart = BigInt(Buffer.from(option.startCursor, 'base64').toString());
     const iEnd = BigInt(Buffer.from(option.endCursor, 'base64').toString());
     return this.pullLogs(
@@ -245,7 +245,6 @@ export default class SlsClient {
   ) {
     const contentMD5 = headers['content-md5'] || '';
     const contentType = headers['content-type'] || '';
-    console.log(contentMD5, contentType);
     const date = headers['date'];
     const canonicalizedHeaders = SlsClient.getCanonicalizedHeaders(headers);
     const canonicalizedResource = SlsClient.getCanonicalizedResource(
@@ -255,7 +254,6 @@ export default class SlsClient {
     const signString =
       `${verb}\n${contentMD5}\n${contentType}\n` +
       `${date}\n${canonicalizedHeaders}${canonicalizedResource}`;
-    console.log(signString, '-----------');
     return `LOG ${SlsClient.config.accessKeyId}:${crypto
       .createHmac('sha1', SlsClient.config.accessKeySecret)
       .update(signString)

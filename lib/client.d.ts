@@ -2,6 +2,7 @@
 /// <reference types="lodash" />
 import { sls } from './sls/sls';
 import { LogGroup } from './contract';
+import { Observable } from 'rxjs/internal/Observable';
 declare type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Selector {
     projectName?: string;
@@ -52,7 +53,7 @@ export default class SlsClient {
      */
     action<T extends Record<string, any>>(url: string, method: Method, queries: T, body?: Buffer | Uint8Array | null, setHeaders?: {
         [k: string]: any;
-    }): import("rxjs/internal/Observable").Observable<import("rxjs/ajax").AjaxResponse>;
+    }): Observable<import("rxjs/ajax").AjaxResponse>;
     /**
      * @description 无主体请求
      * @param urlParams 用于构造url的参数
@@ -73,7 +74,7 @@ export default class SlsClient {
     }, selector?: {
         projectName?: string | undefined;
         logStore?: string | undefined;
-    } | undefined) => import("rxjs/internal/Observable").Observable<sls.LogGroupList>;
+    } | undefined) => Observable<sls.LogGroupList>;
     /**
      * @description 指定游标获取日志
      * @memberof SlsClient
@@ -82,12 +83,12 @@ export default class SlsClient {
         startCursor: string;
         endCursor: string;
         shards: number;
-    }, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<sls.LogGroupList>;
+    }, selector?: Selector | undefined) => Observable<sls.LogGroupList>;
     /**
      * @description 提交一条log
      * @memberof SlsClient
      */
-    postLogStoreLogs: (log: LogGroup, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<import("rxjs/ajax").AjaxResponse>;
+    postLogStoreLogs: (log: LogGroup, selector?: Selector | undefined) => Observable<import("rxjs/ajax").AjaxResponse>;
     static bufferToLogList: (buffer: Buffer) => sls.LogGroupList;
     /**
      * @description 签名
