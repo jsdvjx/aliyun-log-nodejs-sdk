@@ -6,7 +6,6 @@ import { map, pluck } from 'rxjs/operators';
 import _ from 'lodash/fp';
 import { sls } from './sls/sls';
 import { LogGroup } from './contract';
-import { Observable } from 'rxjs/internal/Observable';
 //@ts-ignore
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Selector {
@@ -182,7 +181,9 @@ export default class SlsClient {
     ).pipe(
       pluck('response'),
       map((buffer: ArrayBuffer) =>
-        sls.LogGroupList.decode(new Uint8Array(buffer, 0, buffer.byteLength))
+        SlsClient.logListToObject(
+          sls.LogGroupList.decode(new Uint8Array(buffer, 0, buffer.byteLength))
+        )
       )
     );
   /**
@@ -192,7 +193,7 @@ export default class SlsClient {
   getLogs = (
     option: { startCursor: string; endCursor: string; shards: number },
     selector?: Selector
-  ): Observable<sls.LogGroupList> => {
+  ) => {
     const iStart = BigInt(Buffer.from(option.startCursor, 'base64').toString());
     const iEnd = BigInt(Buffer.from(option.endCursor, 'base64').toString());
     return this.pullLogs(
@@ -283,8 +284,25 @@ export default class SlsClient {
       )
       .sort()
       .join('&');
+  static logListToObject = (logs: sls.LogGroupList): LogGroup[] => {
+    return logs.logGroupList.map(log => {
+      return {
+        ...log,
+        Logs: (log.Logs || []).map(
+          tmp =>
+            ({
+              ...SlsClient.fromPairsToObject()(tmp.Contents || []),
+              __time: tmp.Time
+            } as Record<string, any>)
+        ),
+        LogTags: SlsClient.fromPairsToObject()(log.LogTags || [])
+      } as LogGroup;
+    });
+  };
   static createKvList = (obj: Record<string, any>) =>
-    Object.entries(obj).map(([Key, Value]) => ({ Key, Value }));
+    Object.entries(obj)
+      .filter(([Key]) => !Key.startsWith('__'))
+      .map(([Key, Value]) => ({ Key, Value }));
   static fromPairsToObject = <T = Record<string, string>>(
     mapField: { key: keyof T; value: keyof T } = {
       key: 'Key' as keyof T,
@@ -301,7 +319,7 @@ export default class SlsClient {
           ] as [string, string][],
         []
       )
-    );
+    ) as (arr: any[]) => T;
   static readKvList: (
     param: { Key: string; Value: string }[]
   ) => any = SlsClient.fromPairsToObject({ key: 'Key', value: 'Value' });
@@ -310,7 +328,7 @@ export default class SlsClient {
     return {
       ...logGroup,
       Logs: (logGroup.Logs || []).map(log => ({
-        Time,
+        Time: ((log['__time'] as any) as number) || Time,
         Contents: SlsClient.createKvList(log)
       })),
       LogTags: SlsClient.createKvList(logGroup.LogTags)
