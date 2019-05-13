@@ -1,9 +1,12 @@
+/// <reference types="node" />
+/// <reference types="lodash" />
+import { sls } from './sls/sls';
+import { LogGroup } from './contract';
 declare type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Selector {
     projectName?: string;
     logStore?: string;
 }
-import protobuf from 'protobufjs';
 export interface LogConfig {
     net?: 'intranet';
     endpoint?: string;
@@ -49,7 +52,7 @@ export default class SlsClient {
      */
     action<T extends Record<string, any>>(url: string, method: Method, queries: T, body?: Buffer | Uint8Array | null, setHeaders?: {
         [k: string]: any;
-    }): import("rxjs/internal/Observable").Observable<import("rxjs/internal/observable/dom/AjaxObservable").AjaxResponse>;
+    }): import("rxjs/internal/Observable").Observable<import("rxjs/ajax").AjaxResponse>;
     /**
      * @description 无主体请求
      * @param urlParams 用于构造url的参数
@@ -70,7 +73,7 @@ export default class SlsClient {
     }, selector?: {
         projectName?: string | undefined;
         logStore?: string | undefined;
-    } | undefined) => import("rxjs/internal/Observable").Observable<protobuf.Message<{}>>;
+    } | undefined) => import("rxjs/internal/Observable").Observable<sls.LogGroupList>;
     /**
      * @description 指定游标获取日志
      * @memberof SlsClient
@@ -79,8 +82,13 @@ export default class SlsClient {
         startCursor: string;
         endCursor: string;
         shards: number;
-    }, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<protobuf.Message<{}>>;
-    static bufferToLogList: (buffer: Buffer) => protobuf.Message<{}>;
+    }, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<sls.LogGroupList>;
+    /**
+     * @description 提交一条log
+     * @memberof SlsClient
+     */
+    postLogStoreLogs: (log: LogGroup, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<import("rxjs/ajax").AjaxResponse>;
+    static bufferToLogList: (buffer: Buffer) => sls.LogGroupList;
     /**
      * @description 签名
      * @author jx
@@ -98,5 +106,18 @@ export default class SlsClient {
     private static getCanonicalizedHeaders;
     private static getCanonicalizedResource;
     private static queryString;
+    static createKvList: (obj: Record<string, any>) => {
+        Key: string;
+        Value: any;
+    }[];
+    static fromPairsToObject: <T = Record<string, string>>(mapField?: {
+        key: keyof T;
+        value: keyof T;
+    }) => (a1: ArrayLike<T> | T[] | null | undefined) => import("lodash").Dictionary<any>;
+    static readKvList: (param: {
+        Key: string;
+        Value: string;
+    }[]) => any;
+    private static convertLog;
 }
 export {};
