@@ -5,6 +5,8 @@ import { ajax } from 'rxjs/ajax';
 import { map, pluck } from 'rxjs/operators';
 import _ from 'lodash/fp';
 import { sls } from './sls/sls';
+import { LogGroup } from './contract';
+//@ts-ignore
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Selector {
   projectName?: string;
@@ -15,9 +17,12 @@ interface Selector {
 //const builder = protobuf.loadSync(path.join(__dirname, './sls.proto'));
 //const LogGroupListProto = builder.lookupType('sls.LogGroupList');
 
+//@ts-ignore
 global.XMLHttpRequest = require('xhr2');
 //@ts-ignore
 XMLHttpRequest.prototype._restrictedHeaders.date = false;
+//@ts-ignore
+XMLHttpRequest.prototype._restrictedHeaders['content-length'] = false;
 
 export interface LogConfig {
   net?: 'intranet';
@@ -76,7 +81,7 @@ export default class SlsClient {
    */
   private static baseHeader = {
     accept: 'application/x-protobuf',
-    'content-type': 'application/x-protobuf',
+    'content-type': 'application/json',
     date: new Date().toUTCString(),
     'x-log-apiversion': '0.6.0',
     'x-log-signaturemethod': 'hmac-sha1'
@@ -96,11 +101,9 @@ export default class SlsClient {
     body?: Buffer | Uint8Array | null,
     setHeaders?: { [k: string]: any }
   ) {
-    console.log(url);
     const headers: Record<string, any> = {
       ...SlsClient.baseHeader,
       date: new Date().toUTCString(),
-      ...(setHeaders || {}),
       ...(body
         ? {
             'content-md5': crypto
@@ -110,15 +113,17 @@ export default class SlsClient {
               .toUpperCase(),
             'content-length': body.length
           }
-        : {})
+        : {}),
+      ...(setHeaders || {})
     };
-
     headers['authorization'] = SlsClient.sign(
       method,
       SlsClient.getPathByUrl(url),
       queries,
       headers
     );
+    console.log(headers);
+
     return ajax({
       url,
       method,
@@ -199,6 +204,25 @@ export default class SlsClient {
       selector
     );
   };
+  /**
+   * @description 提交一条log
+   * @memberof SlsClient
+   */
+  postLogStoreLogs = (log: LogGroup, selector?: Selector) => {
+    const url = SlsClient.createVarByTemplate(
+      ['logStore', 'projectName', 'endpoint'],
+      `http://{projectName}.{endpoint}/logstores/{logStore}/shards/lb`,
+      selector
+    );
+    const body = Buffer.from(
+      sls.LogGroup.encode(SlsClient.convertLog(log)).finish()
+    );
+    const header = {
+      'x-log-bodyrawsize': body.byteLength,
+      'content-type': 'application/x-protobuf'
+    };
+    return this.action(url, 'POST', {}, body, header);
+  };
   static bufferToLogList = (buffer: Buffer) => sls.LogGroupList.decode(buffer);
   /**
    * @description 签名
@@ -221,6 +245,7 @@ export default class SlsClient {
   ) {
     const contentMD5 = headers['content-md5'] || '';
     const contentType = headers['content-type'] || '';
+    console.log(contentMD5, contentType);
     const date = headers['date'];
     const canonicalizedHeaders = SlsClient.getCanonicalizedHeaders(headers);
     const canonicalizedResource = SlsClient.getCanonicalizedResource(
@@ -230,6 +255,7 @@ export default class SlsClient {
     const signString =
       `${verb}\n${contentMD5}\n${contentType}\n` +
       `${date}\n${canonicalizedHeaders}${canonicalizedResource}`;
+    console.log(signString, '-----------');
     return `LOG ${SlsClient.config.accessKeyId}:${crypto
       .createHmac('sha1', SlsClient.config.accessKeySecret)
       .update(signString)
@@ -245,7 +271,10 @@ export default class SlsClient {
   private static getCanonicalizedResource = (
     path: string,
     queries: Record<string, any>
-  ) => `${path}?${SlsClient.queryString(queries)}`;
+  ) =>
+    `${path}${
+      SlsClient.queryString(queries) ? `?${SlsClient.queryString(queries)}` : ''
+    }`;
   private static queryString = (queries: Record<string, any>) =>
     Object.entries(queries)
       .map(
@@ -256,6 +285,8 @@ export default class SlsClient {
       )
       .sort()
       .join('&');
+  static createKvList = (obj: Record<string, any>) =>
+    Object.entries(obj).map(([Key, Value]) => ({ Key, Value }));
   static fromPairsToObject = <T = Record<string, string>>(
     mapField: { key: keyof T; value: keyof T } = {
       key: 'Key' as keyof T,
@@ -273,7 +304,18 @@ export default class SlsClient {
         []
       )
     );
-  static readKvList: <O = any>(
+  static readKvList: (
     param: { Key: string; Value: string }[]
-  ) => O = SlsClient.fromPairsToObject({ key: 'Key', value: 'Value' });
+  ) => any = SlsClient.fromPairsToObject({ key: 'Key', value: 'Value' });
+  private static convertLog = (logGroup: LogGroup): sls.ILogGroup => {
+    const Time = Math.floor(Date.now().valueOf() / 1000);
+    return {
+      ...logGroup,
+      Logs: (logGroup.Logs || []).map(log => ({
+        Time,
+        Contents: SlsClient.createKvList(log)
+      })),
+      LogTags: SlsClient.createKvList(logGroup.LogTags)
+    };
+  };
 }

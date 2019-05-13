@@ -6,3 +6,5 @@ coverage
 test/config.js
 test/figures/*.zip
 doc/*
+src/index.ts
+lib/index.js
