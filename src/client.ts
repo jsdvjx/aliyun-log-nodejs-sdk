@@ -6,7 +6,7 @@ import { map, pluck } from 'rxjs/operators';
 import _ from 'lodash/fp';
 import { sls } from './sls/sls';
 import { LogGroup } from './contract';
-import  bigInt  from 'big-integer';
+import bigInt from 'big-integer';
 //@ts-ignore
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Selector {
@@ -195,8 +195,8 @@ export default class SlsClient {
     option: { startCursor: string; endCursor: string; shards: number },
     selector?: Selector
   ) => {
-    const iStart =bigInt(Buffer.from(option.startCursor, 'base64').toString());
-    const iEnd =bigInt(Buffer.from(option.endCursor, 'base64').toString());
+    const iStart = bigInt(Buffer.from(option.startCursor, 'base64').toString());
+    const iEnd = bigInt(Buffer.from(option.endCursor, 'base64').toString());
     return this.pullLogs(
       {
         count: iEnd.minus(iStart).valueOf(),
@@ -303,7 +303,10 @@ export default class SlsClient {
   static createKvList = (obj: Record<string, any>) =>
     Object.entries(obj)
       .filter(([Key]) => !Key.startsWith('__'))
-      .map(([Key, Value]) => ({ Key, Value }));
+      .map(([Key, Value]) => ({
+        Key,
+        Value: typeof Value === 'object' ? JSON.stringify(Value) : Value
+      }));
   static fromPairsToObject = <T = Record<string, string>>(
     mapField: { key: keyof T; value: keyof T } = {
       key: 'Key' as keyof T,
