@@ -1,5 +1,8 @@
 export interface LogGroup {
-    Logs: Record<string, string>[];
+    Logs: {
+        [k: string]: string | number;
+        __time: number;
+    }[];
     LogTags: Record<string, string>;
     Reserved?: string;
     Topic?: string;

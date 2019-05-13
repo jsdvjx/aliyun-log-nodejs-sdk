@@ -6,6 +6,7 @@ import { map, pluck } from 'rxjs/operators';
 import _ from 'lodash/fp';
 import { sls } from './sls/sls';
 import { LogGroup } from './contract';
+import  bigInt  from 'big-integer';
 //@ts-ignore
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Selector {
@@ -194,11 +195,11 @@ export default class SlsClient {
     option: { startCursor: string; endCursor: string; shards: number },
     selector?: Selector
   ) => {
-    const iStart = BigInt(Buffer.from(option.startCursor, 'base64').toString());
-    const iEnd = BigInt(Buffer.from(option.endCursor, 'base64').toString());
+    const iStart =bigInt(Buffer.from(option.startCursor, 'base64').toString());
+    const iEnd =bigInt(Buffer.from(option.endCursor, 'base64').toString());
     return this.pullLogs(
       {
-        count: parseInt((iEnd - iStart).toString()),
+        count: iEnd.minus(iStart).valueOf(),
         cursor: option.startCursor,
         shards: option.shards
       },

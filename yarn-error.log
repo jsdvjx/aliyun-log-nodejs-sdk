@@ -1,5 +1,5 @@
 Arguments: 
-  /usr/bin/node /usr/share/yarn/bin/yarn.js add httpx
+  /usr/bin/node /usr/share/yarn/bin/yarn.js add big-integer
 
 PATH: 
   /home/jsdv/.vscode-remote/bin/57b550c559b945eb9d871dbf2b2e4cb9e31e2551/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
@@ -14,12 +14,12 @@ Platform:
   linux x64
 
 Trace: 
-  Error: EACCES: permission denied, copyfile '/home/jsdv/.cache/yarn/v4/npm-lz4-0.6.2-75fa8264bf4620a90fef30b41b9cb90998d4d5f8/node_modules/lz4/build/lz4.js' -> '/home/jsdv/project/aliyun-log-nodejs-sdk/node_modules/lz4/build/lz4.js'
+  Error: EACCES: permission denied, unlink '/home/jsdv/project/aliyun-log-nodejs-sdk/node_modules/.bin/_mocha'
 
 npm manifest: 
   {
     "name": "sls-client",
-    "version": "0.1.4",
+    "version": "0.1.11",
     "description": "Aliyun Log Service Node.js SDK typescript",
     "main": "./lib/client.js",
     "directories": {
@@ -31,13 +31,7 @@ npm manifest:
     "author": "jsdv",
     "license": "MIT",
     "dependencies": {
-      "@types/request": "^2.48.1",
-      "debug": "^2.6.8",
-      "httpx": "^2.1.2",
-      "kitx": "^1.2.1",
-      "lz4": "^0.6.2",
       "protobufjs": "^6.8.8",
-      "request": "^2.88.0",
       "rxjs": "^6.5.1",
       "xhr2": "^0.1.4"
     },
@@ -3099,9 +3093,10 @@ Lockfile:
     version "1.0.0"
     resolved "https://registry.npm.taobao.org/https-browserify/download/https-browserify-1.0.0.tgz#ec06c10e0a34c0f2faf199f7fd7fc78fffd03c73"
   
-  httpx@^2.1.2:
+  httpx@^2.1.4:
     version "2.1.4"
-    resolved "https://registry.npm.taobao.org/httpx/download/httpx-2.1.4.tgz#b7fbd2ebec11678afbdb53ff65eb6e66cf4d45cc"
+    resolved "https://registry.yarnpkg.com/httpx/-/httpx-2.1.4.tgz#b7fbd2ebec11678afbdb53ff65eb6e66cf4d45cc"
+    integrity sha512-L3ZBpwkxz/3lR9pYgzD7rZ2WUe0im0FXvzbKIQz0saSSD1/c/w1QC1aDGD4SaqPqOBUGfP1K3jb9PhAma4LTOQ==
     dependencies:
       debug "^2.2.0"
   
