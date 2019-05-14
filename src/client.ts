@@ -305,7 +305,7 @@ export default class SlsClient {
       .filter(([Key]) => !Key.startsWith('__'))
       .map(([Key, Value]) => ({
         Key,
-        Value: typeof Value === 'object' ? JSON.stringify(Value) : Value
+        Value: typeof Value === 'object' ? JSON.stringify(Value) : Value.toString()
       }));
   static fromPairsToObject = <T = Record<string, string>>(
     mapField: { key: keyof T; value: keyof T } = {
