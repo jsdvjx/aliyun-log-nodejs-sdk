@@ -5,7 +5,7 @@ import { ajax } from 'rxjs/ajax';
 import { map, pluck } from 'rxjs/operators';
 import _ from 'lodash/fp';
 import { sls } from './sls/sls';
-import { LogGroup } from './contract';
+import { LogGroup, BaseLog } from './contract';
 import bigInt from 'big-integer';
 //@ts-ignore
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -285,7 +285,12 @@ export default class SlsClient {
       )
       .sort()
       .join('&');
-  static logListToObject = (logs: sls.LogGroupList): LogGroup[] => {
+  static logListToObject = <
+    L extends BaseLog = BaseLog,
+    T extends Record<string, string> = Record<string, string>
+  >(
+    logs: sls.LogGroupList
+  ): LogGroup[] => {
     return logs.logGroupList.map(log => {
       return {
         ...log,
@@ -294,10 +299,10 @@ export default class SlsClient {
             ({
               ...SlsClient.fromPairsToObject()(tmp.Contents || []),
               __time: tmp.Time
-            } as Record<string, any>)
+            } as Record<string, any> & { __time: number })
         ),
         LogTags: SlsClient.fromPairsToObject()(log.LogTags || [])
-      } as LogGroup;
+      } as LogGroup<L, T>;
     });
   };
   static createKvList = (obj: Record<string, any>) =>
@@ -305,7 +310,8 @@ export default class SlsClient {
       .filter(([Key]) => !Key.startsWith('__'))
       .map(([Key, Value]) => ({
         Key,
-        Value: typeof Value === 'object' ? JSON.stringify(Value) : Value.toString()
+        Value:
+          typeof Value === 'object' ? JSON.stringify(Value) : Value.toString()
       }));
   static fromPairsToObject = <T = Record<string, string>>(
     mapField: { key: keyof T; value: keyof T } = {

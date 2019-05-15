@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { sls } from './sls/sls';
-import { LogGroup } from './contract';
+import { LogGroup, BaseLog } from './contract';
 declare type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Selector {
     projectName?: string;
@@ -72,7 +72,7 @@ export default class SlsClient {
     }, selector?: {
         projectName?: string | undefined;
         logStore?: string | undefined;
-    } | undefined) => import("rxjs/internal/Observable").Observable<LogGroup[]>;
+    } | undefined) => import("rxjs/internal/Observable").Observable<LogGroup<BaseLog, Record<string, string>>[]>;
     /**
      * @description 指定游标获取日志
      * @memberof SlsClient
@@ -81,12 +81,12 @@ export default class SlsClient {
         startCursor: string;
         endCursor: string;
         shards: number;
-    }, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<LogGroup[]>;
+    }, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<LogGroup<BaseLog, Record<string, string>>[]>;
     /**
      * @description 提交一条log
      * @memberof SlsClient
      */
-    postLogStoreLogs: (log: LogGroup, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<import("rxjs/ajax").AjaxResponse>;
+    postLogStoreLogs: (log: LogGroup<BaseLog, Record<string, string>>, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<import("rxjs/ajax").AjaxResponse>;
     static bufferToLogList: (buffer: Buffer) => sls.LogGroupList;
     /**
      * @description 签名
@@ -105,7 +105,7 @@ export default class SlsClient {
     private static getCanonicalizedHeaders;
     private static getCanonicalizedResource;
     private static queryString;
-    static logListToObject: (logs: sls.LogGroupList) => LogGroup[];
+    static logListToObject: <L extends BaseLog = BaseLog, T extends Record<string, string> = Record<string, string>>(logs: sls.LogGroupList) => LogGroup<BaseLog, Record<string, string>>[];
     static createKvList: (obj: Record<string, any>) => {
         Key: string;
         Value: any;
