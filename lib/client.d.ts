@@ -72,7 +72,7 @@ export default class SlsClient {
     }, selector?: {
         projectName?: string | undefined;
         logStore?: string | undefined;
-    } | undefined) => import("rxjs/internal/Observable").Observable<LogGroup<BaseLog, Record<string, string>>[]>;
+    } | undefined) => import("rxjs/internal/Observable").Observable<LogGroup<L, T>[]>;
     /**
      * @description 指定游标获取日志
      * @memberof SlsClient
@@ -81,7 +81,7 @@ export default class SlsClient {
         startCursor: string;
         endCursor: string;
         shards: number;
-    }, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<LogGroup<BaseLog, Record<string, string>>[]>;
+    }, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<LogGroup<L, T>[]>;
     /**
      * @description 提交一条log
      * @memberof SlsClient
@@ -105,7 +105,7 @@ export default class SlsClient {
     private static getCanonicalizedHeaders;
     private static getCanonicalizedResource;
     private static queryString;
-    static logListToObject: <L extends BaseLog = BaseLog, T extends Record<string, string> = Record<string, string>>(logs: sls.LogGroupList) => LogGroup<BaseLog, Record<string, string>>[];
+    static logListToObject: <L extends BaseLog = BaseLog, T extends Record<string, string> = Record<string, string>>(logs: sls.LogGroupList) => LogGroup<L, T>[];
     static createKvList: (obj: Record<string, any>) => {
         Key: string;
         Value: any;

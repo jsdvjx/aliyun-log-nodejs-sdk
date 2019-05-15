@@ -296,7 +296,7 @@ export default class SlsClient {
     T extends Record<string, string> = Record<string, string>
   >(
     logs: sls.LogGroupList
-  ): LogGroup[] => {
+  ): LogGroup<L, T>[] => {
     return logs.logGroupList.map(log => {
       return {
         ...log,
