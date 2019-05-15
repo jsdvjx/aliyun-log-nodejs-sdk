@@ -163,7 +163,10 @@ export default class SlsClient {
    * @description 拉取日志
    * @memberof SlsClient
    */
-  pullLogs = (
+  pullLogs = <
+    L extends BaseLog = BaseLog,
+    T extends Record<string, string> = Record<string, string>
+  >(
     option: {
       shards?: number;
       cursor: string;
@@ -182,7 +185,7 @@ export default class SlsClient {
     ).pipe(
       pluck('response'),
       map((buffer: ArrayBuffer) =>
-        SlsClient.logListToObject(
+        SlsClient.logListToObject<L, T>(
           sls.LogGroupList.decode(new Uint8Array(buffer, 0, buffer.byteLength))
         )
       )
@@ -191,13 +194,16 @@ export default class SlsClient {
    * @description 指定游标获取日志
    * @memberof SlsClient
    */
-  getLogs = (
+  getLogs = <
+    L extends BaseLog = BaseLog,
+    T extends Record<string, string> = Record<string, string>
+  >(
     option: { startCursor: string; endCursor: string; shards: number },
     selector?: Selector
   ) => {
     const iStart = bigInt(Buffer.from(option.startCursor, 'base64').toString());
     const iEnd = bigInt(Buffer.from(option.endCursor, 'base64').toString());
-    return this.pullLogs(
+    return this.pullLogs<L, T>(
       {
         count: iEnd.minus(iStart).valueOf(),
         cursor: option.startCursor,

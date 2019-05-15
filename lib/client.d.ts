@@ -65,7 +65,7 @@ export default class SlsClient {
      * @description 拉取日志
      * @memberof SlsClient
      */
-    pullLogs: (option: {
+    pullLogs: <L extends BaseLog = BaseLog, T extends Record<string, string> = Record<string, string>>(option: {
         shards?: number | undefined;
         cursor: string;
         count?: number | undefined;
@@ -77,7 +77,7 @@ export default class SlsClient {
      * @description 指定游标获取日志
      * @memberof SlsClient
      */
-    getLogs: (option: {
+    getLogs: <L extends BaseLog = BaseLog, T extends Record<string, string> = Record<string, string>>(option: {
         startCursor: string;
         endCursor: string;
         shards: number;
