@@ -2,6 +2,21 @@
 import { sls } from './sls/sls';
 import { LogGroup, BaseLog } from './contract';
 declare type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
+interface getLogsParams {
+    from: number;
+    to: number;
+    topic?: string;
+    query?: string;
+    line?: number;
+    offset?: number;
+    reverse?: boolean;
+}
+interface getHistogramsParams {
+    from: number;
+    to: number;
+    topic?: string;
+    query?: string;
+}
 interface Selector {
     projectName?: string;
     logStore?: string;
@@ -51,7 +66,7 @@ export default class SlsClient {
      */
     action<T extends Record<string, any>>(url: string, method: Method, queries: T, body?: Buffer | Uint8Array | null, setHeaders?: {
         [k: string]: any;
-    }): import("rxjs/internal/Observable").Observable<import("rxjs/ajax").AjaxResponse>;
+    }): import("rxjs").Observable<import("axios").AxiosResponse<any>>;
     /**
      * @description 无主体请求
      * @param urlParams 用于构造url的参数
@@ -72,21 +87,37 @@ export default class SlsClient {
     }, selector?: {
         projectName?: string | undefined;
         logStore?: string | undefined;
-    } | undefined) => import("rxjs/internal/Observable").Observable<LogGroup<L, T>[]>;
+    } | undefined) => import("rxjs").Observable<LogGroup<L, T>[]>;
+    /**
+     * @description 查询日志
+     * @memberof SlsClient
+     */
+    getLogs: <T = any>(option: getLogsParams, selector?: {
+        projectName?: string | undefined;
+        logStore?: string | undefined;
+    } | undefined) => import("rxjs").Observable<T[]>;
+    /**
+     * @description 分析日志
+     * @memberof SlsClient
+     */
+    getHistograms: <T = any>(option: getHistogramsParams, selector?: {
+        projectName?: string | undefined;
+        logStore?: string | undefined;
+    } | undefined) => import("rxjs").Observable<T[]>;
     /**
      * @description 指定游标获取日志
      * @memberof SlsClient
      */
-    getLogs: <L extends BaseLog = BaseLog, T extends Record<string, string> = Record<string, string>>(option: {
+    getLogsByCursor: <L extends BaseLog = BaseLog, T extends Record<string, string> = Record<string, string>>(option: {
         startCursor: string;
         endCursor: string;
         shards: number;
-    }, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<LogGroup<L, T>[]>;
+    }, selector?: Selector | undefined) => import("rxjs").Observable<LogGroup<L, T>[]>;
     /**
      * @description 提交一条log
      * @memberof SlsClient
      */
-    postLogStoreLogs: (log: LogGroup<BaseLog, Record<string, string>>, selector?: Selector | undefined) => import("rxjs/internal/Observable").Observable<import("rxjs/ajax").AjaxResponse>;
+    postLogStoreLogs: (log: LogGroup<BaseLog, Record<string, string>>, selector?: Selector | undefined) => import("rxjs").Observable<import("axios").AxiosResponse<any>>;
     static bufferToLogList: (buffer: Buffer) => sls.LogGroupList;
     /**
      * @description 签名

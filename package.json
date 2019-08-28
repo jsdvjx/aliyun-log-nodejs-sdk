@@ -1,6 +1,6 @@
 {
   "name": "sls-client",
-  "version": "0.1.18",
+  "version": "0.1.21",
   "description": "Aliyun Log Service Node.js SDK typescript",
   "main": "./lib/client.js",
   "directories": {
@@ -12,6 +12,7 @@
   "author": "jsdv",
   "license": "MIT",
   "dependencies": {
+    "axios": "^0.19.0",
     "big-integer": "^1.6.43",
     "protobufjs": "^6.8.8",
     "rxjs": "^6.5.1",
