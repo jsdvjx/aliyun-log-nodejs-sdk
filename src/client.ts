@@ -2,13 +2,30 @@
 
 import crypto from 'crypto';
 import { ajax } from 'rxjs/ajax';
-import { map, pluck } from 'rxjs/operators';
+import { of, from } from 'rxjs';
+import { map, pluck, catchError, tap } from 'rxjs/operators';
 import _ from 'lodash/fp';
 import { sls } from './sls/sls';
 import { LogGroup, BaseLog } from './contract';
 import bigInt from 'big-integer';
+import axios from 'axios'
 //@ts-ignore
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
+interface getLogsParams {
+  from: number;
+  to: number;
+  topic?: string;
+  query?: string;
+  line?: number;
+  offset?: number;
+  reverse?: boolean
+}
+interface getHistogramsParams {
+  from: number;
+  to: number;
+  topic?: string;
+  query?: string;
+}
 interface Selector {
   projectName?: string;
   logStore?: string;
@@ -107,13 +124,13 @@ export default class SlsClient {
       date: new Date().toUTCString(),
       ...(body
         ? {
-            'content-md5': crypto
-              .createHash('md5')
-              .update(body)
-              .digest('hex')
-              .toUpperCase(),
-            'content-length': body.length
-          }
+          'content-md5': crypto
+            .createHash('md5')
+            .update(body)
+            .digest('hex')
+            .toUpperCase(),
+          'content-length': body.length
+        }
         : {}),
       ...(setHeaders || {})
     };
@@ -123,14 +140,14 @@ export default class SlsClient {
       queries,
       headers
     );
-
-    return ajax({
-      url,
-      method,
-      body,
-      headers,
-      responseType: 'arraybuffer'
-    });
+    return from(axios.request({ url, method, headers }))
+    // return ajax({
+    //   url,
+    //   method,
+    //   body,
+    //   headers,
+    //   responseType: 'arraybuffer'
+    // });
   }
   /**
    * @description 无主体请求
@@ -183,7 +200,7 @@ export default class SlsClient {
       { cursor: option.cursor, count: option.count || 10, type: 'log' },
       selector
     ).pipe(
-      pluck('response'),
+      pluck('data'),
       map((buffer: ArrayBuffer) =>
         SlsClient.logListToObject<L, T>(
           sls.LogGroupList.decode(new Uint8Array(buffer, 0, buffer.byteLength))
@@ -191,10 +208,56 @@ export default class SlsClient {
       )
     );
   /**
+   * @description 查询日志
+   * @memberof SlsClient
+   */
+  getLogs = <T = any>(
+    option: getLogsParams,
+    selector?: { projectName?: string; logStore?: string }
+  ) =>
+    this.noBodyAction(
+      {
+        keys: ['endpoint', 'logStore', 'projectName'],
+        template: `http://{projectName}.{endpoint}/logstores/{logStore}`
+      },
+      { ...option, type: 'log' },
+      selector
+    ).pipe(
+      pluck('data'),
+      map((buffer: T[]) => {
+        return buffer
+      }
+      )
+    );
+  /**
+   * @description 分析日志
+   * @memberof SlsClient
+   */
+  getHistograms = <T = any>(
+    option: getHistogramsParams,
+    selector?: { projectName?: string; logStore?: string }
+  ) =>
+    this.noBodyAction(
+      {
+        keys: ['endpoint', 'logStore', 'projectName'],
+        template: `http://{projectName}.{endpoint}/logstores/{logStore}`
+      },
+      { ...option, type: 'histogram' },
+      selector
+    ).pipe(
+      pluck('data'),
+      map((buffer: T[]) => {
+        return buffer
+      }
+      )
+    );
+
+
+  /**
    * @description 指定游标获取日志
    * @memberof SlsClient
    */
-  getLogs = <
+  getLogsByCursor = <
     L extends BaseLog = BaseLog,
     T extends Record<string, string> = Record<string, string>
   >(
@@ -279,14 +342,14 @@ export default class SlsClient {
     queries: Record<string, any>
   ) =>
     `${path}${
-      SlsClient.queryString(queries) ? `?${SlsClient.queryString(queries)}` : ''
+    SlsClient.queryString(queries) ? `?${SlsClient.queryString(queries)}` : ''
     }`;
   private static queryString = (queries: Record<string, any>) =>
     Object.entries(queries)
       .map(
         pair =>
           `${pair[0]}=${
-            typeof pair[1] === 'undefined' ? '' : pair[1].toString()
+          typeof pair[1] === 'undefined' ? '' : pair[1].toString()
           }`
       )
       .sort()
@@ -317,7 +380,9 @@ export default class SlsClient {
       .map(([Key, Value]) => ({
         Key,
         Value:
-          typeof Value === 'object' ? JSON.stringify(Value) : Value.toString()
+          typeof Value === 'object'
+            ? JSON.stringify(Value)
+            : (Value || '').toString()
       }));
   static fromPairsToObject = <T = Record<string, string>>(
     mapField: { key: keyof T; value: keyof T } = {
@@ -331,7 +396,7 @@ export default class SlsClient {
         (pairs: [string, string][], part: T) =>
           [
             ...pairs,
-            [part[mapField.key].toString(), part[mapField.value].toString()]
+            [part[mapField.key], part[mapField.value]]
           ] as [string, string][],
         []
       )
