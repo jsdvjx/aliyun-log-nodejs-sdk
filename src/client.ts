@@ -9,6 +9,8 @@ import { sls } from './sls/sls';
 import { LogGroup, BaseLog } from './contract';
 import bigInt from 'big-integer';
 import axios from 'axios'
+import * as qs from 'querystring'
+
 //@ts-ignore
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface getLogsParams {
@@ -171,7 +173,7 @@ export default class SlsClient {
       selector
     );
     return this.action(
-      url + '?' + SlsClient.queryString(queries),
+      url + '?' + qs.stringify(queries as any),
       'GET',
       queries
     );
